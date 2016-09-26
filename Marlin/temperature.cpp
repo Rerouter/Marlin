@@ -390,17 +390,17 @@ unsigned char Temperature::soft_pwm[HOTENDS];
 
         #if HAS_PID_FOR_BOTH
           const char* estring = hotend < 0 ? "bed" : "";
-          SERIAL_PROTOCOLPAIR("#define  DEFAULT_", estring); SERIAL_PROTOCOLPAIR("Kp ", workKp);
-          SERIAL_PROTOCOLPAIR("#define  DEFAULT_", estring); SERIAL_PROTOCOLPAIR("Ki ", workKi);
-          SERIAL_PROTOCOLPAIR("#define  DEFAULT_", estring); SERIAL_PROTOCOLPAIR("Kd ", workKd);
+          SERIAL_PROTOCOLPAIR("#define  DEFAULT_", estring); SERIAL_PROTOCOLPAIR("Kp ", workKp); SERIAL_EOL;
+          SERIAL_PROTOCOLPAIR("#define  DEFAULT_", estring); SERIAL_PROTOCOLPAIR("Ki ", workKi); SERIAL_EOL;
+          SERIAL_PROTOCOLPAIR("#define  DEFAULT_", estring); SERIAL_PROTOCOLPAIR("Kd ", workKd); SERIAL_EOL;
         #elif ENABLED(PIDTEMP)
-          SERIAL_PROTOCOLPAIR("#define  DEFAULT_Kp ", workKp);
-          SERIAL_PROTOCOLPAIR("#define  DEFAULT_Ki ", workKi);
-          SERIAL_PROTOCOLPAIR("#define  DEFAULT_Kd ", workKd);
+          SERIAL_PROTOCOLPAIR("#define  DEFAULT_Kp ", workKp); SERIAL_EOL;
+          SERIAL_PROTOCOLPAIR("#define  DEFAULT_Ki ", workKi); SERIAL_EOL;
+          SERIAL_PROTOCOLPAIR("#define  DEFAULT_Kd ", workKd); SERIAL_EOL;
         #else
-          SERIAL_PROTOCOLPAIR("#define  DEFAULT_bedKp ", workKp);
-          SERIAL_PROTOCOLPAIR("#define  DEFAULT_bedKi ", workKi);
-          SERIAL_PROTOCOLPAIR("#define  DEFAULT_bedKd ", workKd);
+          SERIAL_PROTOCOLPAIR("#define  DEFAULT_bedKp ", workKp); SERIAL_EOL;
+          SERIAL_PROTOCOLPAIR("#define  DEFAULT_bedKi ", workKi); SERIAL_EOL;
+          SERIAL_PROTOCOLPAIR("#define  DEFAULT_bedKd ", workKd); SERIAL_EOL;
         #endif
 
         #define _SET_BED_PID() \
@@ -558,6 +558,8 @@ float Temperature::get_pid_output(int e) {
         }
         pTerm[HOTEND_INDEX] = PID_PARAM(Kp, HOTEND_INDEX) * pid_error[HOTEND_INDEX];
         temp_iState[HOTEND_INDEX] += pid_error[HOTEND_INDEX];
+        if(temp_iState[HOTEND_INDEX] > temp_iState_max[HOTEND_INDEX]) {temp_iOverflow[HOTEND_INDEX] = temp_iState[HOTEND_INDEX] - temp_iState_max[HOTEND_INDEX];}
+        if(temp_iState[HOTEND_INDEX] < temp_iState_min[HOTEND_INDEX]) {temp_iOverflow[HOTEND_INDEX] = temp_iState[HOTEND_INDEX] - temp_iState_min[HOTEND_INDEX];} 
         temp_iState[HOTEND_INDEX] = constrain(temp_iState[HOTEND_INDEX], temp_iState_min[HOTEND_INDEX], temp_iState_max[HOTEND_INDEX]);
         iTerm[HOTEND_INDEX] = PID_PARAM(Ki, HOTEND_INDEX) * temp_iState[HOTEND_INDEX];
 
@@ -581,11 +583,11 @@ float Temperature::get_pid_output(int e) {
         #endif // PID_EXTRUSION_SCALING
 
         if (pid_output > PID_MAX) {
-          if (pid_error[HOTEND_INDEX] > 0) temp_iState[HOTEND_INDEX] -= pid_error[HOTEND_INDEX]; // conditional un-integration
+          if (pid_error[HOTEND_INDEX] > 0) temp_iState[HOTEND_INDEX] -= temp_iOverflow[HOTEND_INDEX]; // conditional un-integration
           pid_output = PID_MAX;
         }
         else if (pid_output < 0) {
-          if (pid_error[HOTEND_INDEX] < 0) temp_iState[HOTEND_INDEX] -= pid_error[HOTEND_INDEX]; // conditional un-integration
+          if (pid_error[HOTEND_INDEX] < 0) temp_iState[HOTEND_INDEX] -= temp_iOverflow[HOTEND_INDEX]; // conditional un-integration
           pid_output = 0;
         }
       }
@@ -621,6 +623,8 @@ float Temperature::get_pid_output(int e) {
       pid_error_bed = target_temperature_bed - current_temperature_bed;
       pTerm_bed = bedKp * pid_error_bed;
       temp_iState_bed += pid_error_bed;
+      if(temp_iState_bed > temp_iState_max_bed) {temp_iOverflow_bed = temp_iState_bed - temp_iState_max_bed;}
+      if(temp_iState_bed < temp_iState_min_bed) {temp_iOverflow_bed = temp_iState_bed - temp_iState_min_bed;} 
       temp_iState_bed = constrain(temp_iState_bed, temp_iState_min_bed, temp_iState_max_bed);
       iTerm_bed = bedKi * temp_iState_bed;
 
@@ -629,11 +633,11 @@ float Temperature::get_pid_output(int e) {
 
       pid_output = pTerm_bed + iTerm_bed - dTerm_bed;
       if (pid_output > MAX_BED_POWER) {
-        if (pid_error_bed > 0) temp_iState_bed -= pid_error_bed; // conditional un-integration
+        if (pid_error_bed > 0) temp_iState_bed -= temp_iOverflow_bed; // conditional un-integration
         pid_output = MAX_BED_POWER;
       }
       else if (pid_output < 0) {
-        if (pid_error_bed < 0) temp_iState_bed -= pid_error_bed; // conditional un-integration
+        if (pid_error_bed < 0) temp_iState_bed -= temp_iOverflow_bed; // conditional un-integration
         pid_output = 0;
       }
     #else
